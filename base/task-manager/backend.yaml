@@ -9,39 +9,41 @@ data:
     const { spawn } = require('child_process');
     
     let requestCount = 0;
-    let healthCheckCount = 0;
     let errorCount = 0;
     
     function queryPostgres(sql, callback) {
       const psql = spawn('psql', [
-        '-h', 'postgres-service',
+        '-h', 'postgres-service', 
         '-U', 'taskuser', 
         '-d', 'taskmanager',
         '-t', '-A', '-c', sql
-      ], {
-        env: { ...process.env, PGPASSWORD: 'taskpass123' }
+      ], { 
+        env: { ...process.env, PGPASSWORD: 'taskpass123' } 
       });
       
       let stdout = '';
       let stderr = '';
       
-      psql.stdout.on('data', (data) => stdout += data.toString());
-      psql.stderr.on('data', (data) => stderr += data.toString());
+      psql.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+      
+      psql.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
       
       psql.on('close', (code) => {
         if (code === 0) {
           callback(null, stdout.trim());
         } else {
           errorCount++;
-          callback(new Error(`SQL Error: ${stderr.trim()}`), null);
+          callback(new Error(stderr.trim()), null);
         }
       });
     }
     
     const server = http.createServer((req, res) => {
-      const parsedUrl = url.parse(req.url, true);
-      const path = parsedUrl.pathname;
-      
+      const path = url.parse(req.url, true).pathname;
       requestCount++;
       
       res.setHeader('Access-Control-Allow-Origin', '*');
@@ -58,24 +60,12 @@ data:
       if (path === '/metrics') {
         res.setHeader('Content-Type', 'text/plain');
         res.writeHead(200);
-        res.end(`# HELP task_api_requests_total Total requests
-# TYPE task_api_requests_total counter
-task_api_requests_total ${requestCount}
-
-# HELP task_api_errors_total Total errors
-# TYPE task_api_errors_total counter
-task_api_errors_total ${errorCount}
-
-# HELP task_api_uptime_seconds Uptime in seconds
-# TYPE task_api_uptime_seconds gauge
-task_api_uptime_seconds ${process.uptime()}
-`);
+        res.end('task_api_requests_total ' + requestCount + '\ntask_api_errors_total ' + errorCount + '\n');
         return;
       }
       
       if (path === '/health') {
-        healthCheckCount++;
-        queryPostgres('SELECT NOW()', (err, result) => {
+        queryPostgres('SELECT NOW()', (err) => {
           res.writeHead(200);
           res.end(JSON.stringify({
             status: 'healthy',
@@ -97,7 +87,11 @@ task_api_uptime_seconds ${process.uptime()}
           } else {
             const lines = result.split('\n').filter(line => line.trim());
             const tasks = lines.map(line => {
-              try { return JSON.parse(line); } catch (e) { return null; }
+              try {
+                return JSON.parse(line);
+              } catch(e) {
+                return null;
+              }
             }).filter(task => task !== null);
             
             res.writeHead(200);
@@ -109,14 +103,16 @@ task_api_uptime_seconds ${process.uptime()}
       
       if (path === '/tasks' && req.method === 'POST') {
         let body = '';
-        req.on('data', chunk => body += chunk);
+        req.on('data', chunk => {
+          body += chunk;
+        });
         req.on('end', () => {
           try {
             const newTask = JSON.parse(body);
             const title = newTask.title.replace(/'/g, "''");
-            const completed = newTask.completed ? 'true' : 'false';
+            const sql = "INSERT INTO tasks (title, completed) VALUES ('" + title + "', false) RETURNING row_to_json(tasks)";
             
-            queryPostgres(`INSERT INTO tasks (title, completed) VALUES ('${title}', ${completed}) RETURNING row_to_json(tasks)`, (err, result) => {
+            queryPostgres(sql, (err, result) => {
               if (err) {
                 errorCount++;
                 res.writeHead(500);
@@ -126,7 +122,7 @@ task_api_uptime_seconds ${process.uptime()}
                 res.end(JSON.stringify(JSON.parse(result.trim())));
               }
             });
-          } catch (e) {
+          } catch(e) {
             errorCount++;
             res.writeHead(400);
             res.end(JSON.stringify({ error: 'Invalid JSON' }));
@@ -166,8 +162,6 @@ spec:
         ports:
         - containerPort: 3001
         env:
-        - name: PORT
-          value: "3001"
         - name: PGPASSWORD
           value: "taskpass123"
         volumeMounts:
@@ -195,8 +189,8 @@ spec:
   selector:
     app: task-api
   ports:
-    - name: api-port
-      protocol: TCP
-      port: 3001
-      targetPort: 3001
+  - name: api-port
+    protocol: TCP
+    port: 3001
+    targetPort: 3001
   type: ClusterIP

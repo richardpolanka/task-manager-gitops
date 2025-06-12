@@ -1,19 +1,22 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: task-manager
+namespace: task-manager-gitops
 
 resources:
   - ../../../base/task-manager
 
-patchesStrategicMerge:
-  - dev-patches.yaml
+patches:
+  - path: dev-patches.yaml
+    target:
+      kind: Deployment
 
-commonLabels:
-  environment: dev
+labels:
+  - pairs:
+      environment: dev
 
 # NodePort pro dev přístup
-patchesJson6902:
+patches:
   - target:
       version: v1
       kind: Service
@@ -24,7 +27,7 @@ patchesJson6902:
         value: NodePort
       - op: add
         path: /spec/ports/0/nodePort
-        value: 31001
+        value: 31003
   - target:
       version: v1
       kind: Service  
@@ -35,4 +38,4 @@ patchesJson6902:
         value: NodePort
       - op: add
         path: /spec/ports/0/nodePort
-        value: 31000
+        value: 31002
