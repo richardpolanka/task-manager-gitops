@@ -161,7 +161,7 @@ metadata:
   name: task-api
   namespace: task-manager-gitops
 spec:
-  replicas: 2
+  replicas: 4
   selector:
     matchLabels:
       app: task-api
