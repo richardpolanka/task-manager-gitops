@@ -3,6 +3,12 @@ kind: Kustomization
 
 namespace: task-manager-gitops
 
+# ConfigMap generování z externích souborů
+configMapGenerator:
+- name: frontend-code
+  files:
+  - server.js=frontend-files/server.js
+
 resources:
   - postgres.yaml
   - backend.yaml
@@ -11,5 +17,5 @@ resources:
 labels:
   - pairs:
       app.kubernetes.io/name: task-manager
-      app.kubernetes.io/version: v1.0.0
-      managed-by: argocd
+      app.kubernetes.io/version: v3.0.0
+      app.kubernetes.io/managed-by: argocd
