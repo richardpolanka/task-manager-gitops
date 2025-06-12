@@ -13,7 +13,7 @@ data:
       if (path === '/') {
         res.setHeader('Content-Type', 'text/html');
         res.writeHead(200);
-        res.end('<html><head><title>GitOps Task Manager</title></head><body><h1>GitOps Task Manager test</h1><p>Pod: ' + (process.env.HOSTNAME || 'unknown') + '</p><div id="app">Loading...</div><script>fetch("/api/tasks").then(r=>r.json()).then(tasks=>document.getElementById("app").innerHTML=tasks.map(t=>"<p>"+t.title+"</p>").join("")).catch(e=>document.getElementById("app").innerHTML="Error: "+e.message)</script></body></html>');
+        res.end('<html><head><title>GitOps Task Manager</title></head><body><h1>TEST GitOps Task Manager test</h1><p>Pod: ' + (process.env.HOSTNAME || 'unknown') + '</p><div id="app">Loading...</div><script>fetch("/api/tasks").then(r=>r.json()).then(tasks=>document.getElementById("app").innerHTML=tasks.map(t=>"<p>"+t.title+"</p>").join("")).catch(e=>document.getElementById("app").innerHTML="Error: "+e.message)</script></body></html>');
       } else if (path.startsWith('/api/')) {
         const apiPath = path.replace('/api', '');
         const options = {
