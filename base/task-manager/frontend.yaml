@@ -1,0 +1,170 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-code
+data:
+  server.js: |
+    const http = require('http');
+    const url = require('url');
+    
+    const server = http.createServer((req, res) => {
+      const parsedUrl = url.parse(req.url, true);
+      const path = parsedUrl.pathname;
+      
+      if (path === '/') {
+        res.setHeader('Content-Type', 'text/html');
+        res.writeHead(200);
+        res.end(`<!DOCTYPE html>
+<html><head><title>GitOps Task Manager</title><style>
+body{font-family:Arial;margin:40px;background:#f5f5f5}
+.container{max-width:800px;margin:0 auto;background:white;padding:30px;border-radius:8px}
+h1{color:#333;text-align:center}
+.pod{text-align:center;color:#666;margin-bottom:30px}
+#tasks{margin-top:20px}
+.task{padding:15px;margin:10px 0;background:#f9f9f9;border-left:4px solid #007acc;border-radius:4px}
+button{background:#007acc;color:white;padding:10px 20px;border:none;border-radius:4px;cursor:pointer}
+button:hover{background:#005999}
+input{padding:10px;margin:10px;border:1px solid #ddd;border-radius:4px;width:300px}
+.error{color:red;background:#ffebee;padding:10px;border-radius:4px}
+</style></head>
+<body>
+<div class="container">
+<h1>🚀 GitOps Task Manager</h1>
+<div class="pod">Pod: ${process.env.HOSTNAME || 'unknown'}</div>
+<div>
+<input type="text" id="taskInput" placeholder="Enter new task...">
+<button onclick="addTask()">Add Task</button>
+<button onclick="loadTasks()">Refresh</button>
+</div>
+<div id="tasks">Loading tasks...</div>
+</div>
+<script>
+async function loadTasks() {
+  try {
+    const response = await fetch('/api/tasks');
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    
+    const tasks = await response.json();
+    const tasksHtml = tasks.map(task => 
+      '<div class="task"><strong>' + task.title + '</strong> (ID: ' + task.id + ')</div>'
+    ).join('');
+    
+    document.getElementById('tasks').innerHTML = tasksHtml || '<div>No tasks yet</div>';
+  } catch(error) {
+    document.getElementById('tasks').innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+  }
+}
+
+async function addTask() {
+  const input = document.getElementById('taskInput');
+  const title = input.value.trim();
+  if (!title) return;
+  
+  try {
+    const response = await fetch('/api/tasks', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({title: title, completed: false})
+    });
+    
+    if (response.ok) {
+      input.value = '';
+      loadTasks();
+    } else {
+      throw new Error('HTTP ' + response.status);
+    }
+  } catch(error) {
+    alert('Error: ' + error.message);
+  }
+}
+
+// Enter key support
+document.getElementById('taskInput').addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') addTask();
+});
+
+loadTasks();
+</script>
+</body></html>`);
+      } else if (path.startsWith('/api/')) {
+        const apiPath = path.replace('/api', '');
+        const options = {
+          hostname: 'task-api-service',
+          port: 3001,
+          path: apiPath,
+          method: req.method,
+          headers: req.headers
+        };
+        
+        const apiReq = http.request(options, (apiRes) => {
+          res.writeHead(apiRes.statusCode, apiRes.headers);
+          apiRes.pipe(res);
+        });
+        
+        apiReq.on('error', (error) => {
+          res.writeHead(500);
+          res.end('API Error: ' + error.message);
+        });
+        
+        req.pipe(apiReq);
+      } else {
+        res.writeHead(404);
+        res.end('Not Found');
+      }
+    });
+    
+    server.listen(3000, '0.0.0.0', () => {
+      console.log('Frontend running on port 3000');
+    });
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task-frontend
+  labels:
+    app: task-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: task-frontend
+  template:
+    metadata:
+      labels:
+        app: task-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: node:18-alpine
+        command: ["node", "/app/server.js"]
+        ports:
+        - containerPort: 3000
+        volumeMounts:
+        - name: frontend-code
+          mountPath: /app
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: frontend-code
+        configMap:
+          name: frontend-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: task-frontend-service
+  labels:
+    app: task-frontend
+spec:
+  selector:
+    app: task-frontend
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+  type: ClusterIP

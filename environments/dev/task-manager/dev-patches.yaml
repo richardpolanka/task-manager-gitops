@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task-api
+spec:
+  replicas: 2  # Dev má méně replik
+
+---
+apiVersion: apps/v1  
+kind: Deployment
+metadata:
+  name: task-frontend
+spec:
+  replicas: 1  # Dev frontend 1 replika
