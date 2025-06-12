@@ -21,8 +21,10 @@ spec:
         ports:
         - containerPort: 3000
         volumeMounts:
-        - name: frontend-code
+        - name: server-code
           mountPath: /app
+        - name: static-files
+          mountPath: /app/static
         resources:
           requests:
             memory: "64Mi"
@@ -31,9 +33,12 @@ spec:
             memory: "128Mi"
             cpu: "100m"
       volumes:
-      - name: frontend-code
+      - name: server-code
         configMap:
-          name: frontend-code
+          name: frontend-server
+      - name: static-files
+        configMap:
+          name: frontend-static
 ---
 apiVersion: v1
 kind: Service

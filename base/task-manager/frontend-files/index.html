@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitOps Task Manager</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>íº€ Task Manager</h1>
+            <div class="subtitle">GitOps Kubernetes Deployment</div>
+        </div>
+        
+        <div class="content">
+            <div class="pod-info" id="podInfo">Loading...</div>
+            
+            <div class="input-group">
+                <input type="text" id="taskInput" placeholder="What do you need to do?" maxlength="100">
+                <button class="btn btn-primary" onclick="addTask()">Add Task</button>
+                <button class="btn btn-secondary" onclick="loadTasks()">Refresh</button>
+                <button class="btn btn-secondary" onclick="checkHealth()">Status</button>
+            </div>
+            
+            <div id="message"></div>
+            
+            <div class="tasks">
+                <div id="tasks" class="loading">Loading tasks...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/app.js"></script>
+</body>
+</html>

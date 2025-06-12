@@ -3,11 +3,15 @@ kind: Kustomization
 
 namespace: task-manager-gitops
 
-# ConfigMap generování z externích souborů
 configMapGenerator:
-- name: frontend-code
+- name: frontend-server
   files:
   - server.js=frontend-files/server.js
+- name: frontend-static
+  files:
+  - index.html=frontend-files/index.html
+  - styles.css=frontend-files/styles.css
+  - app.js=frontend-files/app.js
 
 resources:
   - postgres.yaml
