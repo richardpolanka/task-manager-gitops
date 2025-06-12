@@ -12,3 +12,10 @@ metadata:
   name: task-frontend
 spec:
   replicas: 1  # Dev frontend 1 replika
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-exporter
+spec:
+  replicas: 1  # Dev má 1 repliku exporteru

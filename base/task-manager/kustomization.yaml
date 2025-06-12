@@ -17,6 +17,9 @@ resources:
   - postgres.yaml
   - backend.yaml
   - frontend.yaml
+  - postgres-exporter.yaml
+  - postgres-servicemonitor.yaml
+  - postgres-alerts.yaml
 
 labels:
   - pairs:
