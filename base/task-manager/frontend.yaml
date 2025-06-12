@@ -13,90 +13,7 @@ data:
       if (path === '/') {
         res.setHeader('Content-Type', 'text/html');
         res.writeHead(200);
-        res.end('<!DOCTYPE html>' +
-'<html><head><title>GitOps Task Manager</title><style>' +
-'body{font-family:Arial;margin:20px;background:#f5f5f5}' +
-'.container{max-width:800px;margin:0 auto;background:white;padding:20px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}' +
-'h1{color:#333;text-align:center;margin-bottom:10px}' +
-'.pod{text-align:center;color:#666;font-size:14px;margin-bottom:20px}' +
-'.controls{text-align:center;margin-bottom:20px}' +
-'input{padding:8px;margin:5px;border:1px solid #ddd;border-radius:4px;width:300px}' +
-'button{background:#007acc;color:white;padding:8px 16px;border:none;border-radius:4px;cursor:pointer;margin:5px}' +
-'button:hover{background:#005999}' +
-'#tasks{margin-top:20px}' +
-'.task{padding:12px;margin:8px 0;background:#f9f9f9;border-left:4px solid #007acc;border-radius:4px}' +
-'.error{color:red;background:#ffebee;padding:10px;border-radius:4px;margin:10px 0}' +
-'.success{color:green;background:#e8f5e8;padding:10px;border-radius:4px;margin:10px 0}' +
-'</style></head>' +
-'<body>' +
-'<div class="container">' +
-'<h1>íº€ GitOps Task Manager</h1>' +
-'<div class="pod">Pod: ' + (process.env.HOSTNAME || 'unknown') + '</div>' +
-'<div class="controls">' +
-'<input type="text" id="taskInput" placeholder="Enter new task...">' +
-'<button onclick="addTask()">Add Task</button>' +
-'<button onclick="loadTasks()">Refresh</button>' +
-'<button onclick="checkHealth()">Health</button>' +
-'</div>' +
-'<div id="message"></div>' +
-'<div id="tasks">Loading tasks...</div>' +
-'</div>' +
-'<script>' +
-'function showMessage(text, type) {' +
-'  document.getElementById("message").innerHTML = "<div class=\"" + type + "\">" + text + "</div>";' +
-'  setTimeout(() => document.getElementById("message").innerHTML = "", 3000);' +
-'}' +
-'async function loadTasks() {' +
-'  try {' +
-'    const response = await fetch("/api/tasks");' +
-'    if (!response.ok) throw new Error("HTTP " + response.status);' +
-'    const tasks = await response.json();' +
-'    const tasksHtml = tasks.map(task => ' +
-'      "<div class=\"task\"><strong>" + task.title + "</strong> (ID: " + task.id + ")</div>"' +
-'    ).join("");' +
-'    document.getElementById("tasks").innerHTML = tasksHtml || "<div>No tasks yet</div>";' +
-'    showMessage("Tasks loaded (" + tasks.length + " items)", "success");' +
-'  } catch(error) {' +
-'    document.getElementById("tasks").innerHTML = "<div class=\"error\">Error: " + error.message + "</div>";' +
-'    showMessage("Error loading tasks: " + error.message, "error");' +
-'  }' +
-'}' +
-'async function addTask() {' +
-'  const input = document.getElementById("taskInput");' +
-'  const title = input.value.trim();' +
-'  if (!title) { showMessage("Please enter a task title", "error"); return; }' +
-'  try {' +
-'    const response = await fetch("/api/tasks", {' +
-'      method: "POST",' +
-'      headers: {"Content-Type": "application/json"},' +
-'      body: JSON.stringify({title: title, completed: false})' +
-'    });' +
-'    if (response.ok) {' +
-'      input.value = "";' +
-'      loadTasks();' +
-'      showMessage("Task added successfully!", "success");' +
-'    } else {' +
-'      throw new Error("HTTP " + response.status);' +
-'    }' +
-'  } catch(error) {' +
-'    showMessage("Error adding task: " + error.message, "error");' +
-'  }' +
-'}' +
-'async function checkHealth() {' +
-'  try {' +
-'    const response = await fetch("/api/health");' +
-'    const health = await response.json();' +
-'    showMessage("Health: " + health.status + ", DB: " + health.database + ", Pod: " + health.hostname, "success");' +
-'  } catch(error) {' +
-'    showMessage("Health check failed: " + error.message, "error");' +
-'  }' +
-'}' +
-'document.getElementById("taskInput").addEventListener("keypress", function(e) {' +
-'  if (e.key === "Enter") addTask();' +
-'});' +
-'loadTasks();' +
-'</script>' +
-'</body></html>');
+        res.end('<html><head><title>GitOps Task Manager</title></head><body><h1>GitOps Task Manager</h1><p>Pod: ' + (process.env.HOSTNAME || 'unknown') + '</p><div id="app">Loading...</div><script>fetch("/api/tasks").then(r=>r.json()).then(tasks=>document.getElementById("app").innerHTML=tasks.map(t=>"<p>"+t.title+"</p>").join("")).catch(e=>document.getElementById("app").innerHTML="Error: "+e.message)</script></body></html>');
       } else if (path.startsWith('/api/')) {
         const apiPath = path.replace('/api', '');
         const options = {
@@ -114,7 +31,7 @@ data:
         
         apiReq.on('error', (error) => {
           res.writeHead(500);
-          res.end('API Error: ' + error.message);
+          res.end('API Error');
         });
         
         req.pipe(apiReq);
