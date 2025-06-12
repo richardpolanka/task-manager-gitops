@@ -11,5 +11,5 @@ resources:
 labels:
   - pairs:
       app.kubernetes.io/name: task-manager
-      app.kubernetes.io/version: v2.0.0
-      app.kubernetes.io/managed-by: argocd
+      app.kubernetes.io/version: v1.0.0
+      managed-by: argocd
