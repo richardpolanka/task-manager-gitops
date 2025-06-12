@@ -7,16 +7,20 @@ resources:
   - ../../../base/task-manager
 
 patches:
-  - path: dev-patches.yaml
-    target:
+  - target:
       kind: Deployment
-
-labels:
-  - pairs:
-      environment: dev
-
-# NodePort pro dev přístup
-patches:
+      name: task-api
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+  - target:
+      kind: Deployment
+      name: task-frontend
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
   - target:
       version: v1
       kind: Service
@@ -39,3 +43,8 @@ patches:
       - op: add
         path: /spec/ports/0/nodePort
         value: 31002
+
+labels:
+  - pairs:
+      environment: dev
+      version: v2.0.0

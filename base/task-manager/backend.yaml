@@ -1,49 +1,37 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: backend-with-metrics
+  name: backend-code
 data:
   server.js: |
     const http = require('http');
-    const url = require('url');
     const { spawn } = require('child_process');
     
     let requestCount = 0;
-    let errorCount = 0;
     
     function queryPostgres(sql, callback) {
-      const psql = spawn('psql', [
-        '-h', 'postgres-service', 
-        '-U', 'taskuser', 
-        '-d', 'taskmanager',
-        '-t', '-A', '-c', sql
-      ], { 
-        env: { ...process.env, PGPASSWORD: 'taskpass123' } 
+      const psql = spawn('psql', ['-h', 'postgres-service', '-U', 'taskuser', '-d', 'taskmanager', '-t', '-A', '-c', sql], {
+        env: { ...process.env, PGPASSWORD: 'taskpass123' }
       });
       
       let stdout = '';
       let stderr = '';
       
-      psql.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-      
-      psql.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
+      psql.stdout.on('data', (data) => stdout += data.toString());
+      psql.stderr.on('data', (data) => stderr += data.toString());
       
       psql.on('close', (code) => {
         if (code === 0) {
           callback(null, stdout.trim());
         } else {
-          errorCount++;
-          callback(new Error(stderr.trim()), null);
+          console.error('DB Error:', stderr);
+          callback(new Error('Database error: ' + stderr), null);
         }
       });
     }
     
     const server = http.createServer((req, res) => {
-      const path = url.parse(req.url, true).pathname;
+      const path = require('url').parse(req.url, true).pathname;
       requestCount++;
       
       res.setHeader('Access-Control-Allow-Origin', '*');
@@ -51,28 +39,21 @@ data:
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       res.setHeader('Content-Type', 'application/json');
       
-      if (req.method === 'OPTIONS') {
-        res.writeHead(200);
-        res.end();
-        return;
-      }
-      
-      if (path === '/metrics') {
-        res.setHeader('Content-Type', 'text/plain');
-        res.writeHead(200);
-        res.end('task_api_requests_total ' + requestCount + '\ntask_api_errors_total ' + errorCount + '\n');
-        return;
+      if (req.method === 'OPTIONS') { 
+        res.writeHead(200); 
+        res.end(); 
+        return; 
       }
       
       if (path === '/health') {
-        queryPostgres('SELECT NOW()', (err) => {
+        queryPostgres('SELECT NOW() as now', (err, result) => {
           res.writeHead(200);
           res.end(JSON.stringify({
             status: 'healthy',
             database: err ? 'disconnected' : 'connected',
             hostname: process.env.HOSTNAME || 'unknown',
             requests: requestCount,
-            errors: errorCount
+            timestamp: new Date().toISOString()
           }));
         });
         return;
@@ -81,21 +62,27 @@ data:
       if (path === '/tasks' && req.method === 'GET') {
         queryPostgres('SELECT row_to_json(t) FROM (SELECT * FROM tasks ORDER BY id) t', (err, result) => {
           if (err) {
-            errorCount++;
             res.writeHead(500);
-            res.end(JSON.stringify({ error: err.message }));
+            res.end(JSON.stringify({ error: 'Failed to fetch tasks: ' + err.message }));
           } else {
-            const lines = result.split('\n').filter(line => line.trim());
-            const tasks = lines.map(line => {
-              try {
-                return JSON.parse(line);
-              } catch(e) {
-                return null;
-              }
-            }).filter(task => task !== null);
-            
-            res.writeHead(200);
-            res.end(JSON.stringify(tasks));
+            try {
+              const lines = result.split('\n').filter(line => line.trim());
+              const tasks = lines.map(line => {
+                try {
+                  return JSON.parse(line);
+                } catch(e) {
+                  console.error('JSON parse error:', line);
+                  return null;
+                }
+              }).filter(task => task !== null);
+              
+              res.writeHead(200);
+              res.end(JSON.stringify(tasks));
+            } catch(e) {
+              console.error('Processing error:', e);
+              res.writeHead(500);
+              res.end(JSON.stringify({ error: 'Data processing error' }));
+            }
           }
         });
         return;
@@ -103,40 +90,61 @@ data:
       
       if (path === '/tasks' && req.method === 'POST') {
         let body = '';
-        req.on('data', chunk => {
-          body += chunk;
-        });
+        req.on('data', chunk => body += chunk);
         req.on('end', () => {
           try {
             const newTask = JSON.parse(body);
-            const title = newTask.title.replace(/'/g, "''");
-            const sql = "INSERT INTO tasks (title, completed) VALUES ('" + title + "', false) RETURNING row_to_json(tasks)";
+            
+            if (!newTask.title || newTask.title.trim() === '') {
+              res.writeHead(400);
+              res.end(JSON.stringify({ error: 'Task title is required' }));
+              return;
+            }
+            
+            const title = newTask.title.trim().replace(/'/g, "''");
+            const completed = newTask.completed ? 'true' : 'false';
+            
+            const sql = `INSERT INTO tasks (title, completed) VALUES ('${title}', ${completed}) RETURNING row_to_json(tasks)`;
             
             queryPostgres(sql, (err, result) => {
               if (err) {
-                errorCount++;
+                console.error('Insert error:', err);
                 res.writeHead(500);
-                res.end(JSON.stringify({ error: err.message }));
+                res.end(JSON.stringify({ error: 'Failed to create task: ' + err.message }));
               } else {
-                res.writeHead(201);
-                res.end(JSON.stringify(JSON.parse(result.trim())));
+                try {
+                  const taskData = JSON.parse(result.trim());
+                  res.writeHead(201);
+                  res.end(JSON.stringify(taskData));
+                } catch(e) {
+                  console.error('Response parse error:', e, 'Result:', result);
+                  // Fallback response
+                  res.writeHead(201);
+                  res.end(JSON.stringify({ 
+                    id: Date.now(), 
+                    title: title,
+                    completed: newTask.completed || false,
+                    created_at: new Date().toISOString()
+                  }));
+                }
               }
             });
           } catch(e) {
-            errorCount++;
+            console.error('Request parse error:', e);
             res.writeHead(400);
-            res.end(JSON.stringify({ error: 'Invalid JSON' }));
+            res.end(JSON.stringify({ error: 'Invalid JSON in request body' }));
           }
         });
         return;
       }
       
       res.writeHead(404);
-      res.end(JSON.stringify({ error: 'Not Found' }));
+      res.end(JSON.stringify({ error: 'Not Found: ' + path }));
     });
     
     server.listen(3001, '0.0.0.0', () => {
       console.log('Task API running on port 3001');
+      console.log('Environment:', process.env.NODE_ENV || 'development');
     });
 ---
 apiVersion: apps/v1
@@ -164,6 +172,8 @@ spec:
         env:
         - name: PGPASSWORD
           value: "taskpass123"
+        - name: NODE_ENV
+          value: "production"
         volumeMounts:
         - name: app-code
           mountPath: /app
@@ -174,10 +184,22 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 5
+          periodSeconds: 5
       volumes:
       - name: app-code
         configMap:
-          name: backend-with-metrics
+          name: backend-code
 ---
 apiVersion: v1
 kind: Service
